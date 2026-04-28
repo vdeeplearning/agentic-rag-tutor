@@ -18,7 +18,7 @@ LangGraph loop that can retrieve evidence, evaluate whether that evidence is
 sufficient, decide whether to answer, retry with a rewritten query, or stop, and
 then expose those decisions in an Agent Trace.
 
-Interview-safe wording:
+Suggested wording:
 
 ```text
 This is an agentic RAG tutor. It uses a LangGraph workflow where the model
@@ -26,6 +26,13 @@ retrieves evidence, grades whether the evidence is sufficient, retries with a
 rewritten query when needed, and only answers when the retrieved chunks support
 the response.
 ```
+
+## Cited Evidence Screenshot
+
+The app shows only the chunk or chunks cited by the final answer. Matching
+answer terms are highlighted inside the full cited chunk.
+
+![Highlighted cited evidence screenshot](docs/images/cited-evidence-highlight.png)
 
 ## Features
 
