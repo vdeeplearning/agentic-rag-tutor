@@ -2,6 +2,7 @@ import streamlit as st
 
 from src.chunking import chunk_documents
 from src.ingest import ingest_uploaded_files
+from src.rag import answer_question
 from src.vectorstore import index_chunks, retrieve_chunks
 
 
@@ -65,9 +66,12 @@ if st.button("Ask"):
     if not question.strip():
         st.warning("Please enter a question first.")
     else:
-        with st.spinner("Retrieving relevant chunks..."):
+        with st.spinner("Retrieving chunks and generating an answer..."):
             retrieved_chunks = retrieve_chunks(question)
+            answer = answer_question(question, retrieved_chunks)
 
+        st.subheader("Answer")
+        st.write(answer)
         st.success(f"Retrieved {len(retrieved_chunks)} chunks.")
 
         st.subheader("Retrieved Chunks")
@@ -87,9 +91,6 @@ if st.button("Ask"):
 
                 with st.expander(title):
                     st.write(preview)
-
-st.subheader("Answer")
-st.write("LLM answering is not implemented yet. This milestone only retrieves chunks.")
 
 st.subheader("Agent Trace")
 st.write("No agent trace yet.")
