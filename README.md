@@ -13,19 +13,11 @@ part of the RAG pipeline is easy to inspect.
 
 Yes. This is best described as a constrained agentic RAG workflow.
 
-It is not a fully autonomous general-purpose agent. The app has a focused
-LangGraph loop that can retrieve evidence, evaluate whether that evidence is
-sufficient, decide whether to answer, retry with a rewritten query, or stop, and
-then expose those decisions in an Agent Trace.
-
-Suggested wording:
-
-```text
-This is an agentic RAG tutor. It uses a LangGraph workflow where the model
-retrieves evidence, grades whether the evidence is sufficient, retries with a
-rewritten query when needed, and only answers when the retrieved chunks support
-the response.
-```
+It is not a fully autonomous general-purpose agent. The app uses a focused
+LangGraph workflow where the model retrieves evidence, grades whether the
+evidence is sufficient, retries with a rewritten query when needed, and only
+answers when the retrieved chunks support the response. Those decisions are
+shown in the Agent Trace.
 
 ## Cited Evidence Screenshot
 
