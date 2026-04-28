@@ -1,8 +1,7 @@
 """Answer questions using retrieved chunks.
 
-This file intentionally stays small for the current milestone:
-retrieve chunks -> format them as context -> ask the LLM for a cited answer.
-LangGraph, query rewriting, and more advanced agent behavior can come later.
+This file exposes both the simple answer helper and the higher-level agentic
+RAG entry point used by the Streamlit app.
 """
 
 import os
@@ -36,6 +35,28 @@ def answer_question(question: str, retrieved_chunks: list[dict[str, Any]]) -> st
     return str(response.content)
 
 
+def run_agentic_rag(question: str) -> dict[str, Any]:
+    """Run the LangGraph retrieve -> grade -> answer loop."""
+    from src.graph import build_agentic_rag_graph
+
+    graph = build_agentic_rag_graph()
+    initial_state = {
+        "user_question": question,
+        "current_query": question,
+        "attempts": 0,
+        "retrieved_chunks": [],
+        "decision": {},
+        "answer": "",
+        "trace": [],
+    }
+    final_state = graph.invoke(initial_state)
+
+    return {
+        "answer": final_state.get("answer", ""),
+        "trace": final_state.get("trace", []),
+    }
+
+
 def _format_chunks_for_context(retrieved_chunks: list[dict[str, Any]]) -> str:
     """Turn retrieved chunks into plain text the model can cite."""
     formatted_chunks: list[str] = []
@@ -52,9 +73,10 @@ def _format_chunks_for_context(retrieved_chunks: list[dict[str, Any]]) -> str:
 
         formatted_chunks.append(
             (
-                f"Source: {source}\n"
+                f"Citation: [{source}, page {page}, chunk {chunk_id}]\n"
+                f"Source filename: {source}\n"
                 f"Page: {page}\n"
-                f"Chunk ID: {chunk_id}\n"
+                f"Chunk: {chunk_id}\n"
                 f"Text:\n{text}"
             )
         )
