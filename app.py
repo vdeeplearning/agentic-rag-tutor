@@ -461,18 +461,22 @@ def _show_quiz_mode_tab():
 st.set_page_config(page_title="Agentic RAG Tutor", layout="wide")
 
 st.title("Agentic RAG Tutor")
+st.caption(
+    "Start with Quiz Mode to practice from your documents, or use Ask Questions "
+    "for exploratory citation-grounded Q&A."
+)
 
 _show_api_settings()
 _show_indexing_controls()
 
 mode = st.radio(
     "Mode",
-    ["Ask Questions", "Quiz Mode"],
+    ["Quiz Mode", "Ask Questions"],
     horizontal=True,
     key="active_mode",
 )
 
-if mode == "Ask Questions":
-    _show_ask_questions_tab()
-else:
+if mode == "Quiz Mode":
     _show_quiz_mode_tab()
+else:
+    _show_ask_questions_tab()

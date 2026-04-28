@@ -1,10 +1,14 @@
 # Agentic RAG Tutor
 
-Agentic RAG Tutor is a Streamlit app for asking questions about uploaded
-documents. It extracts text, chunks it, stores embeddings in ChromaDB, retrieves
-relevant chunks, evaluates whether the evidence is strong enough, and then
-answers with citations. It also includes a Quiz Mode that generates and grades
-practice questions from the uploaded documents.
+Agentic RAG Tutor is a Streamlit study app for learning from uploaded
+documents. Its main tutoring workflow is Quiz Mode: the app retrieves source
+chunks, generates a practice question, grades the user's answer, and shows the
+cited evidence used for feedback.
+
+The app also includes an Ask Questions mode for citation-grounded Q&A. In that
+mode, it extracts text, chunks it, stores embeddings in ChromaDB, retrieves
+relevant chunks, evaluates whether the evidence is strong enough, and answers
+with citations.
 
 The project is intentionally beginner-friendly and built in milestones, so each
 part of the RAG pipeline is easy to inspect.
@@ -19,7 +23,15 @@ evidence is sufficient, retries with a rewritten query when needed, and only
 answers when the retrieved chunks support the response. Those decisions are
 shown in the Agent Trace.
 
-## Cited Evidence Screenshot
+## Quiz Mode Example
+
+Quiz Mode is the main learning path. The user can enter a topic, generate a
+question from uploaded documents, submit an answer, and receive a score,
+feedback, an ideal answer, and cited evidence.
+
+![Quiz Mode example screenshot](docs/images/quiz-mode-example.png)
+
+## Ask Questions Example
 
 The app shows only the chunk or chunks cited by the final answer. Matching
 answer terms are highlighted inside the full cited chunk.
@@ -34,13 +46,15 @@ answer terms are highlighted inside the full cited chunk.
 - Split documents into overlapping character-based chunks.
 - Store embeddings in persistent ChromaDB storage at `data/chroma`.
 - Skip re-indexing files that have already been embedded.
+- Paste an OpenAI API key in the Streamlit sidebar for the current session.
+- Generate and grade quiz questions using only uploaded-document evidence.
+- Show quiz scores, concise feedback, ideal answers, and cited source chunks.
 - Retrieve relevant chunks with OpenAI embeddings.
-- Use a LangGraph loop to decide whether to answer, retry retrieval, or stop.
+- Use a LangGraph loop in Ask Questions mode to decide whether to answer, retry
+  retrieval, or stop.
 - Generate citation-grounded answers using only retrieved chunks.
 - Show an Agent Trace so the retrieval and evidence-grading workflow is visible.
 - Show only the final cited chunk evidence, with matching terms highlighted.
-- Paste an OpenAI API key in the Streamlit sidebar for the current session.
-- Generate and grade quiz questions using only uploaded-document evidence.
 
 ## Project Structure
 
@@ -129,12 +143,61 @@ in the sidebar unless you already configured one in `.env`.
 11. Chunks are stored in the persistent Chroma vector database under
     `data/chroma`.
 12. The file hash is recorded in `data/indexed_files.json`.
-13. The user chooses either `Ask Questions` or `Quiz Mode`.
-14. In `Ask Questions`, LangGraph runs the agentic RAG loop.
-15. In `Quiz Mode`, the app retrieves source chunks and uses them to generate
+13. The user chooses either `Quiz Mode` or `Ask Questions`. Quiz Mode appears
+    first because the project is designed as a tutor.
+14. In `Quiz Mode`, the app retrieves source chunks and uses them to generate
     and grade a practice question.
+15. In `Ask Questions`, LangGraph runs the agentic RAG loop.
 
-### Agentic Workflow Diagram
+### Quiz Mode Workflow Diagram
+
+```mermaid
+flowchart TD
+    A["User opens Quiz Mode"] --> B{"Topic entered?"}
+    B -- "Yes" --> C["Retrieve chunks for the topic"]
+    B -- "No" --> D["Retrieve chunks with broad key-concepts query"]
+    C --> E["Format retrieved chunks as source context"]
+    D --> E
+    E --> F["LLM generates one quiz question"]
+    F --> G["Store question and source chunks in session_state"]
+    G --> H["User types an answer"]
+    H --> I["LLM grades answer using only source chunks"]
+    I --> J["Return score, correctness, feedback, ideal answer, and citation"]
+    J --> K["Show only cited chunk evidence"]
+```
+
+### Indexing
+
+1. Upload documents in the Streamlit UI.
+2. Click `Index documents`.
+3. The app saves each file, computes a SHA256 hash, and skips files already in
+   `data/indexed_files.json`.
+4. New files are extracted into document sections.
+5. Sections are split into overlapping chunks.
+6. Existing chunks for the same source filename are deleted from ChromaDB.
+7. Chunks are embedded with OpenAI embeddings and stored in ChromaDB.
+
+### Quiz Mode
+
+1. Select `Quiz Mode`, which is the default mode when the app opens.
+2. Optionally enter a topic.
+3. Click `Generate Quiz Question`.
+4. The app retrieves source chunks and asks the LLM to create one grounded quiz
+   question.
+5. Type your answer and click `Submit Answer`.
+6. The app grades your answer using only the source chunks and shows:
+   - score
+   - correct or incorrect result
+   - feedback
+   - ideal answer
+   - citation
+   - only the cited chunk evidence used for grading
+
+Quiz Mode is not currently the LangGraph retry loop. It is a direct grounded
+workflow: retrieve chunks, generate a question, grade the user's answer using
+those same chunks, and show cited evidence.
+
+### Ask Questions Workflow Diagram
 
 ```mermaid
 flowchart TD
@@ -162,17 +225,6 @@ flowchart TD
     R --> S
 ```
 
-### Indexing
-
-1. Upload documents in the Streamlit UI.
-2. Click `Index documents`.
-3. The app saves each file, computes a SHA256 hash, and skips files already in
-   `data/indexed_files.json`.
-4. New files are extracted into document sections.
-5. Sections are split into overlapping chunks.
-6. Existing chunks for the same source filename are deleted from ChromaDB.
-7. Chunks are embedded with OpenAI embeddings and stored in ChromaDB.
-
 ### Ask Questions
 
 1. Select `Ask Questions`.
@@ -193,41 +245,6 @@ flowchart TD
 
 The Agent Trace intentionally does not dump every retrieved chunk. The evidence
 section shows only the chunk or chunks cited by the final answer.
-
-### Quiz Mode
-
-```mermaid
-flowchart TD
-    A["User opens Quiz Mode"] --> B{"Topic entered?"}
-    B -- "Yes" --> C["Retrieve chunks for the topic"]
-    B -- "No" --> D["Retrieve chunks with broad key-concepts query"]
-    C --> E["Format retrieved chunks as source context"]
-    D --> E
-    E --> F["LLM generates one quiz question"]
-    F --> G["Store question and source chunks in session_state"]
-    G --> H["User types an answer"]
-    H --> I["LLM grades answer using only source chunks"]
-    I --> J["Return score, correctness, feedback, ideal answer, and citation"]
-    J --> K["Show only cited chunk evidence"]
-```
-
-1. Select `Quiz Mode`.
-2. Optionally enter a topic.
-3. Click `Generate Quiz Question`.
-4. The app retrieves source chunks and asks the LLM to create one grounded quiz
-   question.
-5. Type your answer and click `Submit Answer`.
-6. The app grades your answer using only the source chunks and shows:
-   - score
-   - correct or incorrect result
-   - feedback
-   - ideal answer
-   - citation
-   - only the cited chunk evidence used for grading
-
-Quiz Mode is not currently the LangGraph retry loop. It is a direct grounded
-workflow: retrieve chunks, generate a question, grade the user's answer using
-those same chunks, and show cited evidence.
 
 ## Citation Format
 
