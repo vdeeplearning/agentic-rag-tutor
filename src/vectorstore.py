@@ -1,15 +1,16 @@
-"""Store and retrieve chunks with ChromaDB.
+"""Store and retrieve chunks with ChromaDB and OpenAI embeddings.
 
 This module is the retrieval milestone only. It embeds chunks, saves them in a
 persistent local Chroma database, and retrieves similar chunks for a question.
 It does not call an LLM or generate answers yet.
 """
 
+import os
 from typing import Any
 
 import chromadb
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from dotenv import load_dotenv
+from langchain_openai import OpenAIEmbeddings
 
 from src.config import CHROMA_DIR
 
@@ -18,16 +19,25 @@ COLLECTION_NAME = "agentic_rag_tutor"
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 
-def get_embedding_function() -> OpenAIEmbeddingFunction:
-    """Create the OpenAI embedding function used by Chroma."""
+def get_vectorstore():
+    """Open the persistent Chroma collection used by the app."""
+    CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+
+    client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+    return client.get_or_create_collection(name=COLLECTION_NAME)
+
+
+def _get_embeddings() -> OpenAIEmbeddings:
+    """Create the OpenAI embedding model.
+
+    The API key is loaded from a local .env file so secrets stay out of code.
+    """
     load_dotenv()
 
-    # Chroma's OpenAIEmbeddingFunction reads OPENAI_API_KEY when this env var
-    # name is supplied. Keeping the key in .env avoids hard-coding secrets.
-    return OpenAIEmbeddingFunction(
-        model_name=EMBEDDING_MODEL,
-        api_key_env_var="OPENAI_API_KEY",
-    )
+    if not os.getenv("OPENAI_API_KEY"):
+        raise ValueError("OPENAI_API_KEY is missing. Add it to a .env file first.")
+
+    return OpenAIEmbeddings(model=EMBEDDING_MODEL)
 
 
 def index_chunks(chunks: list[dict[str, Any]]) -> int:
@@ -35,7 +45,8 @@ def index_chunks(chunks: list[dict[str, Any]]) -> int:
 
     Returns the number of non-empty chunks sent to Chroma.
     """
-    collection = _get_collection()
+    collection = get_vectorstore()
+    embeddings = _get_embeddings()
 
     ids: list[str] = []
     documents: list[str] = []
@@ -55,12 +66,15 @@ def index_chunks(chunks: list[dict[str, Any]]) -> int:
     if not documents:
         return 0
 
+    document_embeddings = embeddings.embed_documents(documents)
+
     # upsert lets a beginner click the button more than once without duplicate
     # ID errors. Existing chunks with the same ID are replaced.
     collection.upsert(
         ids=ids,
         documents=documents,
         metadatas=metadatas,
+        embeddings=document_embeddings,
     )
 
     return len(documents)
@@ -71,9 +85,12 @@ def retrieve_chunks(query: str, k: int = 8) -> list[dict[str, Any]]:
     if not query.strip():
         return []
 
-    collection = _get_collection()
+    collection = get_vectorstore()
+    embeddings = _get_embeddings()
+    query_embedding = embeddings.embed_query(query)
+
     results = collection.query(
-        query_texts=[query],
+        query_embeddings=[query_embedding],
         n_results=k,
         include=["documents", "metadatas", "distances"],
     )
@@ -93,17 +110,6 @@ def retrieve_chunks(query: str, k: int = 8) -> list[dict[str, Any]]:
         )
 
     return retrieved_chunks
-
-
-def _get_collection():
-    """Open the persistent Chroma collection."""
-    CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-
-    client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    return client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        embedding_function=get_embedding_function(),
-    )
 
 
 def _chunk_id(metadata: dict[str, Any]) -> str:

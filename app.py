@@ -70,20 +70,22 @@ if st.button("Ask"):
 
         st.success(f"Retrieved {len(retrieved_chunks)} chunks.")
 
-        with st.expander("Retrieved chunks", expanded=True):
-            if not retrieved_chunks:
-                st.write("No chunks were retrieved.")
-            else:
-                for index, chunk in enumerate(retrieved_chunks, start=1):
-                    metadata = chunk["metadata"]
-                    page = metadata["page"] or "N/A"
-                    preview = chunk["text"][:1000]
+        st.subheader("Retrieved Chunks")
+        if not retrieved_chunks:
+            st.write("No chunks were retrieved.")
+        else:
+            for index, chunk in enumerate(retrieved_chunks, start=1):
+                metadata = chunk["metadata"]
+                page = metadata["page"] or "N/A"
+                preview = chunk["text"][:1000]
 
-                    st.markdown(
-                        f"**Result {index}: {metadata['source']} "
-                        f"(page: {page}, id: {metadata['chunk_id']}, "
-                        f"distance: {chunk['distance']:.4f})**"
-                    )
+                title = (
+                    f"Result {index}: {metadata['source']} "
+                    f"(page: {page}, id: {metadata['chunk_id']}, "
+                    f"distance: {chunk['distance']:.4f})"
+                )
+
+                with st.expander(title):
                     st.write(preview)
 
 st.subheader("Answer")
