@@ -142,6 +142,21 @@ flowchart TD
 
 ### Quiz Mode
 
+```mermaid
+flowchart TD
+    A["User opens Quiz Mode"] --> B{"Topic entered?"}
+    B -- "Yes" --> C["Retrieve chunks for the topic"]
+    B -- "No" --> D["Retrieve chunks with broad key-concepts query"]
+    C --> E["Format retrieved chunks as source context"]
+    D --> E
+    E --> F["LLM generates one quiz question"]
+    F --> G["Store question and source chunks in session_state"]
+    G --> H["User types an answer"]
+    H --> I["LLM grades answer using only source chunks"]
+    I --> J["Return score, correctness, feedback, ideal answer, and citation"]
+    J --> K["Show source chunks for transparency"]
+```
+
 1. Open the `Quiz Mode` tab.
 2. Optionally enter a topic.
 3. Click `Generate Quiz Question`.
