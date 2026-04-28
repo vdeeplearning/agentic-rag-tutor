@@ -6,12 +6,11 @@ grounded in the uploaded documents.
 """
 
 import json
-import os
 from typing import Any
 
-from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
+from src.config import get_openai_api_key
 from src.rag import _format_chunks_for_context
 from src.vectorstore import retrieve_chunks
 
@@ -72,10 +71,13 @@ Source chunks:
 """.strip()
 
 
-def generate_quiz_question(topic: str | None = None) -> dict[str, Any]:
+def generate_quiz_question(
+    topic: str | None = None,
+    openai_api_key: str | None = None,
+) -> dict[str, Any]:
     """Generate one quiz question from retrieved document chunks."""
     query = topic.strip() if topic and topic.strip() else GENERAL_QUIZ_QUERY
-    source_chunks = retrieve_chunks(query, k=6)
+    source_chunks = retrieve_chunks(query, k=6, openai_api_key=openai_api_key)
 
     if not source_chunks:
         return {
@@ -86,7 +88,7 @@ def generate_quiz_question(topic: str | None = None) -> dict[str, Any]:
 
     context = _format_chunks_for_context(source_chunks)
     prompt = QUIZ_GENERATION_PROMPT.format(context=context)
-    response = _get_chat_model().invoke(prompt)
+    response = _get_chat_model(openai_api_key).invoke(prompt)
     parsed = _parse_json_response(str(response.content))
 
     return {
@@ -100,6 +102,7 @@ def grade_quiz_answer(
     question: str,
     user_answer: str,
     source_chunks: list[dict[str, Any]],
+    openai_api_key: str | None = None,
 ) -> dict[str, Any]:
     """Grade a quiz answer using only the chunks that created the question."""
     if not source_chunks:
@@ -117,7 +120,7 @@ def grade_quiz_answer(
         user_answer=user_answer,
         context=context,
     )
-    response = _get_chat_model().invoke(prompt)
+    response = _get_chat_model(openai_api_key).invoke(prompt)
     parsed = _parse_json_response(str(response.content))
 
     return {
@@ -129,14 +132,14 @@ def grade_quiz_answer(
     }
 
 
-def _get_chat_model() -> ChatOpenAI:
+def _get_chat_model(openai_api_key: str | None = None) -> ChatOpenAI:
     """Create the chat model used for quiz generation and grading."""
-    load_dotenv()
+    api_key = get_openai_api_key(openai_api_key)
 
-    if not os.getenv("OPENAI_API_KEY"):
-        raise ValueError("OPENAI_API_KEY is missing. Add it to a .env file first.")
+    if not api_key:
+        raise ValueError("OpenAI API key is missing. Add one in the sidebar first.")
 
-    return ChatOpenAI(model=CHAT_MODEL, temperature=0)
+    return ChatOpenAI(model=CHAT_MODEL, temperature=0, api_key=api_key)
 
 
 def _parse_json_response(content: str) -> dict[str, Any]:

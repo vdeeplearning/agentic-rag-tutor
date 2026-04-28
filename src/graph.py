@@ -6,10 +6,8 @@ If they are related but weak, the graph retries with a rewritten query.
 """
 
 import json
-import os
 from typing import Any
 
-from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
@@ -17,6 +15,7 @@ from src.prompts import EVIDENCE_GRADER_PROMPT
 from src.rag import _format_chunks_for_context, answer_question
 from src.schemas import AgentState
 from src.vectorstore import retrieve_chunks
+from src.config import get_openai_api_key
 
 
 MAX_ATTEMPTS = 3
@@ -52,7 +51,10 @@ def build_agentic_rag_graph():
 
 def _retrieve(state: AgentState) -> dict[str, Any]:
     """Retrieve chunks for the current query and record the attempt."""
-    retrieved_chunks = retrieve_chunks(state["current_query"])
+    retrieved_chunks = retrieve_chunks(
+        state["current_query"],
+        openai_api_key=state.get("openai_api_key"),
+    )
     attempts = state["attempts"] + 1
     trace = list(state["trace"])
 
@@ -101,6 +103,7 @@ def _answer(state: AgentState) -> dict[str, str]:
         "answer": answer_question(
             state["user_question"],
             state["retrieved_chunks"],
+            openai_api_key=state.get("openai_api_key"),
         )
     }
 
@@ -134,7 +137,7 @@ def _call_evidence_grader(state: AgentState) -> dict[str, str]:
         context=context,
     )
 
-    llm = _get_chat_model()
+    llm = _get_chat_model(state.get("openai_api_key"))
     response = llm.invoke(prompt)
     return _parse_grader_json(str(response.content))
 
@@ -186,14 +189,14 @@ def _fallback_rewritten_query(state: AgentState) -> str:
     return f"{state['user_question']} key supporting facts from uploaded documents"
 
 
-def _get_chat_model() -> ChatOpenAI:
+def _get_chat_model(openai_api_key: str | None = None) -> ChatOpenAI:
     """Create the chat model used by the evidence grader."""
-    load_dotenv()
+    api_key = get_openai_api_key(openai_api_key)
 
-    if not os.getenv("OPENAI_API_KEY"):
-        raise ValueError("OPENAI_API_KEY is missing. Add it to a .env file first.")
+    if not api_key:
+        raise ValueError("OpenAI API key is missing. Add one in the sidebar first.")
 
-    return ChatOpenAI(model=CHAT_MODEL, temperature=0)
+    return ChatOpenAI(model=CHAT_MODEL, temperature=0, api_key=api_key)
 
 
 def _parse_grader_json(content: str) -> dict[str, str]:

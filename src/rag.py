@@ -4,38 +4,44 @@ This file exposes both the simple answer helper and the higher-level agentic
 RAG entry point used by the Streamlit app.
 """
 
-import os
 from typing import Any
 
-from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
+from src.config import get_openai_api_key
 from src.prompts import ANSWER_PROMPT
 
 
 CHAT_MODEL = "gpt-4o-mini"
 
 
-def answer_question(question: str, retrieved_chunks: list[dict[str, Any]]) -> str:
+def answer_question(
+    question: str,
+    retrieved_chunks: list[dict[str, Any]],
+    openai_api_key: str | None = None,
+) -> str:
     """Generate a citation-grounded answer from retrieved chunks."""
     if not retrieved_chunks:
         return "The answer is not found in the uploaded documents."
 
-    load_dotenv()
+    api_key = get_openai_api_key(openai_api_key)
 
-    if not os.getenv("OPENAI_API_KEY"):
-        raise ValueError("OPENAI_API_KEY is missing. Add it to a .env file first.")
+    if not api_key:
+        raise ValueError("OpenAI API key is missing. Add one in the sidebar first.")
 
     context = _format_chunks_for_context(retrieved_chunks)
     prompt = ANSWER_PROMPT.format(question=question, context=context)
 
-    llm = ChatOpenAI(model=CHAT_MODEL, temperature=0)
+    llm = ChatOpenAI(model=CHAT_MODEL, temperature=0, api_key=api_key)
     response = llm.invoke(prompt)
 
     return str(response.content)
 
 
-def run_agentic_rag(question: str) -> dict[str, Any]:
+def run_agentic_rag(
+    question: str,
+    openai_api_key: str | None = None,
+) -> dict[str, Any]:
     """Run the LangGraph retrieve -> grade -> answer loop."""
     from src.graph import build_agentic_rag_graph
 
@@ -48,6 +54,7 @@ def run_agentic_rag(question: str) -> dict[str, Any]:
         "decision": {},
         "answer": "",
         "trace": [],
+        "openai_api_key": openai_api_key,
     }
     final_state = graph.invoke(initial_state)
 

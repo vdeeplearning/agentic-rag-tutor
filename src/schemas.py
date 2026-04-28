@@ -17,3 +17,4 @@ class AgentState(TypedDict):
     decision: dict[str, Any]
     answer: str
     trace: list[dict[str, Any]]
+    openai_api_key: str | None

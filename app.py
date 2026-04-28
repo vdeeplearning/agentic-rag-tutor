@@ -1,11 +1,36 @@
 import streamlit as st
 
 from src.chunking import chunk_documents
+from src.config import get_openai_api_key
 from src.dedup import compute_file_hash, is_file_indexed, mark_file_indexed
 from src.ingest import extract_text_from_file, save_uploaded_file
 from src.quiz import generate_quiz_question, grade_quiz_answer
 from src.rag import run_agentic_rag
 from src.vectorstore import index_chunks
+
+
+def _show_api_settings():
+    """Let users provide their own OpenAI key for this session."""
+    with st.sidebar:
+        st.header("API Settings")
+        entered_key = st.text_input(
+            "OpenAI API Key",
+            type="password",
+            help="Your key is used only for this session and is not stored.",
+        )
+
+        if entered_key:
+            st.session_state.openai_api_key = entered_key
+
+
+def _get_active_openai_api_key():
+    """Return the session key first, then the local .env fallback."""
+    return get_openai_api_key(st.session_state.get("openai_api_key"))
+
+
+def _warn_missing_api_key():
+    """Show one consistent warning when an OpenAI key is needed."""
+    st.warning("Please enter an OpenAI API key in the sidebar first.")
 
 
 def _format_page(page):
@@ -115,6 +140,12 @@ def _show_indexing_controls():
     )
 
     if st.button("Index documents"):
+        openai_api_key = _get_active_openai_api_key()
+
+        if not openai_api_key:
+            _warn_missing_api_key()
+            return
+
         if not uploaded_files:
             st.warning("Please upload at least one document first.")
         else:
@@ -135,7 +166,10 @@ def _show_indexing_controls():
 
                     file_documents = extract_text_from_file(saved_path)
                     file_chunks = chunk_documents(file_documents)
-                    file_indexed_count = index_chunks(file_chunks)
+                    file_indexed_count = index_chunks(
+                        file_chunks,
+                        openai_api_key=openai_api_key,
+                    )
 
                     # Only mark the file after Chroma accepts its chunk embeddings.
                     if file_indexed_count > 0:
@@ -192,11 +226,20 @@ def _show_ask_questions_tab():
     question = st.text_input("Ask a question about your documents")
 
     if st.button("Ask"):
+        openai_api_key = _get_active_openai_api_key()
+
+        if not openai_api_key:
+            _warn_missing_api_key()
+            return
+
         if not question.strip():
             st.warning("Please enter a question first.")
         else:
             with st.spinner("Running agentic retrieval and generating an answer..."):
-                result = run_agentic_rag(question)
+                result = run_agentic_rag(
+                    question,
+                    openai_api_key=openai_api_key,
+                )
 
             st.subheader("Answer")
             st.write(result["answer"])
@@ -220,8 +263,17 @@ def _show_quiz_mode_tab():
     )
 
     if st.button("Generate Quiz Question"):
+        openai_api_key = _get_active_openai_api_key()
+
+        if not openai_api_key:
+            _warn_missing_api_key()
+            return
+
         with st.spinner("Generating a quiz question from your documents..."):
-            st.session_state.quiz_item = generate_quiz_question(topic)
+            st.session_state.quiz_item = generate_quiz_question(
+                topic,
+                openai_api_key=openai_api_key,
+            )
             st.session_state.quiz_grade = None
 
     if not st.session_state.quiz_item:
@@ -240,6 +292,12 @@ def _show_quiz_mode_tab():
     )
 
     if st.button("Submit Answer"):
+        openai_api_key = _get_active_openai_api_key()
+
+        if not openai_api_key:
+            _warn_missing_api_key()
+            return
+
         if not user_answer.strip():
             st.warning("Please enter an answer before submitting.")
         else:
@@ -248,6 +306,7 @@ def _show_quiz_mode_tab():
                     quiz_item["question"],
                     user_answer,
                     quiz_item["source_chunks"],
+                    openai_api_key=openai_api_key,
                 )
 
     if st.session_state.quiz_grade:
@@ -267,6 +326,7 @@ st.set_page_config(page_title="Agentic RAG Tutor", layout="wide")
 
 st.title("Agentic RAG Tutor")
 
+_show_api_settings()
 _show_indexing_controls()
 
 ask_tab, quiz_tab = st.tabs(["Ask Questions", "Quiz Mode"])

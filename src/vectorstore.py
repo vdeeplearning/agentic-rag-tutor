@@ -5,14 +5,12 @@ persistent local Chroma database, and retrieves similar chunks for a question.
 It does not call an LLM or generate answers yet.
 """
 
-import os
 from typing import Any
 
 import chromadb
-from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings
 
-from src.config import CHROMA_DIR
+from src.config import CHROMA_DIR, get_openai_api_key
 
 
 COLLECTION_NAME = "agentic_rag_tutor"
@@ -27,26 +25,29 @@ def get_vectorstore():
     return client.get_or_create_collection(name=COLLECTION_NAME)
 
 
-def _get_embeddings() -> OpenAIEmbeddings:
+def _get_embeddings(openai_api_key: str | None = None) -> OpenAIEmbeddings:
     """Create the OpenAI embedding model.
 
-    The API key is loaded from a local .env file so secrets stay out of code.
+    A UI-provided key is preferred, with .env as a local development fallback.
     """
-    load_dotenv()
+    api_key = get_openai_api_key(openai_api_key)
 
-    if not os.getenv("OPENAI_API_KEY"):
-        raise ValueError("OPENAI_API_KEY is missing. Add it to a .env file first.")
+    if not api_key:
+        raise ValueError("OpenAI API key is missing. Add one in the sidebar first.")
 
-    return OpenAIEmbeddings(model=EMBEDDING_MODEL)
+    return OpenAIEmbeddings(model=EMBEDDING_MODEL, api_key=api_key)
 
 
-def index_chunks(chunks: list[dict[str, Any]]) -> int:
+def index_chunks(
+    chunks: list[dict[str, Any]],
+    openai_api_key: str | None = None,
+) -> int:
     """Save embedded chunks in the persistent Chroma collection.
 
     Returns the number of non-empty chunks sent to Chroma.
     """
     collection = get_vectorstore()
-    embeddings = _get_embeddings()
+    embeddings = _get_embeddings(openai_api_key)
 
     ids: list[str] = []
     documents: list[str] = []
@@ -80,13 +81,17 @@ def index_chunks(chunks: list[dict[str, Any]]) -> int:
     return len(documents)
 
 
-def retrieve_chunks(query: str, k: int = 8) -> list[dict[str, Any]]:
+def retrieve_chunks(
+    query: str,
+    k: int = 8,
+    openai_api_key: str | None = None,
+) -> list[dict[str, Any]]:
     """Retrieve the top matching chunks for a question."""
     if not query.strip():
         return []
 
     collection = get_vectorstore()
-    embeddings = _get_embeddings()
+    embeddings = _get_embeddings(openai_api_key)
     query_embedding = embeddings.embed_query(query)
 
     results = collection.query(
