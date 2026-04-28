@@ -1,5 +1,6 @@
 import streamlit as st
 
+from src.chunking import chunk_documents
 from src.ingest import ingest_uploaded_files
 
 
@@ -18,10 +19,12 @@ if st.button("Index documents"):
         st.warning("Please upload at least one document first.")
     else:
         documents = ingest_uploaded_files(uploaded_files)
+        chunks = chunk_documents(documents)
 
         st.success("Documents saved and text extracted.")
         st.write(f"Files processed: {len(uploaded_files)}")
         st.write(f"Extracted text sections/pages: {len(documents)}")
+        st.write(f"Chunks created: {len(chunks)}")
 
         with st.expander("Preview extracted text"):
             if not documents:
@@ -34,6 +37,21 @@ if st.button("Index documents"):
                     st.markdown(
                         f"**Section {index}: {document['source']} "
                         f"(page: {page})**"
+                    )
+                    st.write(preview)
+
+        with st.expander("Preview chunks"):
+            if not chunks:
+                st.write("No chunks were created.")
+            else:
+                for index, chunk in enumerate(chunks, start=1):
+                    metadata = chunk["metadata"]
+                    page = metadata["page"] or "N/A"
+                    preview = chunk["text"][:1000]
+
+                    st.markdown(
+                        f"**Chunk {index}: {metadata['source']} "
+                        f"(page: {page}, id: {metadata['chunk_id']})**"
                     )
                     st.write(preview)
 
