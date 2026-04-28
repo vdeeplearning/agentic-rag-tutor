@@ -81,10 +81,28 @@ def index_chunks(
     return len(documents)
 
 
+def delete_chunks_for_source(source: str) -> int:
+    """Delete existing Chroma chunks for one source filename.
+
+    This is used before re-indexing a file so stale chunks with old metadata do
+    not remain in the vector store.
+    """
+    collection = get_vectorstore()
+    existing = collection.get(where={"source": source})
+    ids = existing.get("ids", [])
+
+    if not ids:
+        return 0
+
+    collection.delete(ids=ids)
+    return len(ids)
+
+
 def retrieve_chunks(
     query: str,
     k: int = 8,
     openai_api_key: str | None = None,
+    source_filters: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve the top matching chunks for a question."""
     if not query.strip():
@@ -94,11 +112,19 @@ def retrieve_chunks(
     embeddings = _get_embeddings(openai_api_key)
     query_embedding = embeddings.embed_query(query)
 
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=k,
-        include=["documents", "metadatas", "distances"],
-    )
+    query_kwargs: dict[str, Any] = {
+        "query_embeddings": [query_embedding],
+        "n_results": k,
+        "include": ["documents", "metadatas", "distances"],
+    }
+
+    if source_filters:
+        if len(source_filters) == 1:
+            query_kwargs["where"] = {"source": source_filters[0]}
+        else:
+            query_kwargs["where"] = {"source": {"$in": source_filters}}
+
+    results = collection.query(**query_kwargs)
 
     retrieved_chunks: list[dict[str, Any]] = []
     documents = results.get("documents", [[]])[0]
