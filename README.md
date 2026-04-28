@@ -90,6 +90,34 @@ in the sidebar unless you already configured one in `.env`.
 
 ## How It Works
 
+### Agentic Workflow Diagram
+
+```mermaid
+flowchart TD
+    A["User uploads documents"] --> B["Save files to data/uploads"]
+    B --> C["Compute SHA256 file hash"]
+    C --> D{"Already indexed?"}
+    D -- "Yes" --> E["Skip re-embedding"]
+    D -- "No" --> F["Extract text from PDF, TXT, DOCX, or Markdown"]
+    F --> G["Split text into overlapping chunks"]
+    G --> H["Embed chunks with OpenAI embeddings"]
+    H --> I["Store chunks in ChromaDB"]
+    I --> J["Mark file indexed in data/indexed_files.json"]
+    E --> K["User asks a question"]
+    J --> K
+    K --> L["Retrieve chunks from ChromaDB"]
+    L --> M["Evidence grader LLM checks retrieved chunks"]
+    M --> N{"Decision"}
+    N -- "answer" --> O["Generate cited answer from retrieved chunks"]
+    N -- "retry" --> P{"Attempts < 3?"}
+    P -- "Yes" --> Q["Rewrite retrieval query"]
+    Q --> L
+    P -- "No" --> R["Return not-found answer"]
+    N -- "stop" --> R
+    O --> S["Show answer and Agent Trace"]
+    R --> S
+```
+
 ### Indexing
 
 1. Upload documents in the Streamlit UI.
